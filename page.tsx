@@ -1,3 +1,2 @@
-
-import GhostModeGenerator from './api/generate/client';
+import GhostModeGenerator from './client';
 export default function Page() { return <GhostModeGenerator />; }
