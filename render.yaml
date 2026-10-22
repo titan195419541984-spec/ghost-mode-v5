@@ -1,0 +1,18 @@
+
+services:
+  - type: web
+    name: ghost-mode-v4
+    env: node
+    plan: free
+    branch: main
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NODE_VERSION
+        value: 18.17.0
+    routes:
+      - type: rewrite
+        source: /app-ads.txt
+        destination: /app-ads.txt
