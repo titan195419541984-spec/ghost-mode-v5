@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
-const PIXAZO_VIDEO_URL = 'https://api.pixazo.ai/v1/text-to-video';
+const PIXAZO_VIDEO_URL = 'https://gateway.pixazo.ai/gemini-omni-1-1/v1/text-to-video';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,11 +38,11 @@ export async function POST(request: NextRequest) {
     if (!prompt || prompt.length > 4000) {
       return NextResponse.json({ success: false, error: 'Prompt must contain 1–4000 characters.' }, { status: 400 });
     }
-    if (!Number.isInteger(duration) || duration < 2 || duration > 10) {
-      return NextResponse.json({ success: false, error: 'Duration must be a whole number from 2 to 10 seconds.' }, { status: 400 });
+    if (!Number.isInteger(duration) || duration < 3 || duration > 10) {
+      return NextResponse.json({ success: false, error: 'Duration must be a whole number from 3 to 10 seconds.' }, { status: 400 });
     }
-    if (!['9:16', '16:9', '1:1'].includes(String(aspectRatio))) {
-      return NextResponse.json({ success: false, error: 'aspect_ratio must be 9:16, 16:9, or 1:1.' }, { status: 400 });
+    if (!['9:16', '16:9'].includes(String(aspectRatio))) {
+      return NextResponse.json({ success: false, error: 'Video format must be 9:16 or 16:9.' }, { status: 400 });
     }
     if (!['720p', '1080p'].includes(String(resolution))) {
       return NextResponse.json({ success: false, error: 'resolution must be 720p or 1080p.' }, { status: 400 });
@@ -54,10 +54,10 @@ export async function POST(request: NextRequest) {
     const upstream = await fetch(PIXAZO_VIDEO_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        'Ocp-Apim-Subscription-Key': apiKey,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ prompt, duration, aspect_ratio: aspectRatio, resolution, style }),
+      body: JSON.stringify({ prompt, duration, aspect_ratio: aspectRatio }),
       signal: AbortSignal.timeout(30000)
     });
 
@@ -77,13 +77,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const jobId = typeof data.job_id === 'string' ? data.job_id : undefined;
-    const videoUrl = typeof data.output_url === 'string' ? data.output_url : undefined;
+    const jobId = typeof data.request_id === 'string' ? data.request_id : undefined;
+    const output = data.output && typeof data.output === 'object' ? data.output as Record<string, unknown> : {};
+    const mediaUrls = Array.isArray(output.media_url) ? output.media_url : [];
+    const videoUrl = typeof mediaUrls[0] === 'string' ? mediaUrls[0] : undefined;
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      meta: { aspect_ratio: aspectRatio, duration, resolution, style, engine: 'Pixazo Text-to-Video API' },
-      status: data.status ?? (videoUrl ? 'completed' : 'processing'),
+      meta: { aspect_ratio: aspectRatio, duration, engine: 'Pixazo Gemini Omni 1.1 Flash' },
+      status: data.status ?? (videoUrl ? 'COMPLETED' : 'QUEUED'),
       job_id: jobId,
       estimated_time: data.estimated_time,
       poll_url: jobId ? `/api/cgi/status?job_id=${encodeURIComponent(jobId)}` : undefined,
