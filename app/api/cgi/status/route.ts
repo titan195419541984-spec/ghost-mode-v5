@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(`https://api.pixazo.ai/v1/jobs/${encodeURIComponent(jobId)}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    const upstream = await fetch(`https://gateway.pixazo.ai/v2/requests/status/${encodeURIComponent(jobId)}`, {
+      headers: { 'Ocp-Apim-Subscription-Key': apiKey },
       cache: 'no-store',
       signal: AbortSignal.timeout(15000)
     });
@@ -37,14 +37,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const output = data.output && typeof data.output === 'object' ? data.output as Record<string, unknown> : {};
+    const mediaUrls = Array.isArray(output.media_url) ? output.media_url : [];
     return NextResponse.json({
       success: true,
-      status: data.status ?? 'processing',
+      status: data.status ?? 'QUEUED',
       job_id: jobId,
       assets: {
-        video_url: typeof data.output_url === 'string' ? data.output_url : undefined,
-        thumbnail_url: typeof data.cover_url === 'string' ? data.cover_url : ''
+        video_url: typeof mediaUrls[0] === 'string' ? mediaUrls[0] : undefined,
+        thumbnail_url: ''
       },
+      error: typeof data.error === 'string' ? data.error : undefined,
       provider: data
     });
   } catch (error) {
