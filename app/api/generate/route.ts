@@ -1,73 +1,94 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   try {
-    const { prompt } = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
+    }
+
+    const prompt = body && typeof body === 'object' && !Array.isArray(body)
+      ? (body as Record<string, unknown>).prompt
+      : undefined;
 
     if (typeof prompt !== 'string' || !prompt.trim()) {
       return NextResponse.json({ error: 'Please enter a prompt.' }, { status: 400 });
     }
+    if (prompt.trim().length > 4000) {
+      return NextResponse.json({ error: 'Prompt must be 4000 characters or fewer.' }, { status: 400 });
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Missing GEMINI_API_KEY in Render environment variables.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Missing GEMINI_API_KEY in Render environment variables.' }, { status: 500 });
     }
 
     const enhancedPrompt = `Generate a high-quality fashion CGI image for Ghost Mode: stealth fashion, dark techwear, cinematic studio lighting, ultra-detailed fashion catalog style. User request: ${prompt.trim()}. Avoid text, logos, and watermarks.`;
+    const upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        model: 'gemini-nano-banana-2.1',
+        input: enhancedPrompt,
+        response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: '1:1', image_size: '1K' }
+      }),
+      signal: AbortSignal.timeout(90000),
+      cache: 'no-store'
+    });
 
-    const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: enhancedPrompt }] }],
-          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-        })
-      }
-    );
+    const raw = await upstream.text();
+    let data: Record<string, unknown>;
+    try { data = JSON.parse(raw) as Record<string, unknown>; }
+    catch { data = { message: raw.slice(0, 1000) }; }
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Gemini image generation error:', data);
+    if (!upstream.ok) {
+      console.error('[GEMINI-IMAGE] Upstream request failed:', upstream.status, data);
+      const upstreamError = data.error && typeof data.error === 'object'
+        ? (data.error as Record<string, unknown>).message
+        : undefined;
       return NextResponse.json(
-        { error: data?.error?.message || 'Gemini image generation failed.' },
+        { error: typeof upstreamError === 'string' ? upstreamError : 'Gemini image generation failed.', provider_status: upstream.status },
         { status: 502 }
       );
     }
 
-    const parts = data?.candidates?.[0]?.content?.parts || [];
-    const imageParts = parts.filter(
-      (part: { inlineData?: { data?: string; mimeType?: string } }) =>
-        typeof part.inlineData?.data === 'string'
-    );
-    const imagePart = imageParts[imageParts.length - 1];
+    // The Interactions API may expose image data through output_image or as an image block in output/steps.
+    const candidates: unknown[] = [];
+    const collect = (value: unknown, depth = 0): void => {
+      if (depth > 8 || !value || typeof value !== 'object') return;
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.data === 'string' && (obj.type === 'image' || typeof obj.mime_type === 'string' || typeof obj.mimeType === 'string')) {
+        candidates.push(obj);
+      }
+      for (const [key, child] of Object.entries(obj)) {
+        if (key === 'output_image' && child && typeof child === 'object') candidates.unshift(child);
+        else if (Array.isArray(child)) child.forEach(item => collect(item, depth + 1));
+        else if (child && typeof child === 'object') collect(child, depth + 1);
+      }
+    };
+    collect(data);
+    const image = candidates.find(item => item && typeof item === 'object' && typeof (item as Record<string, unknown>).data === 'string') as Record<string, unknown> | undefined;
 
-    if (!imagePart?.inlineData?.data) {
-      console.error('Gemini returned no image data:', data);
-      return NextResponse.json(
-        { error: 'The image service returned no image. Try a different prompt.' },
-        { status: 502 }
-      );
+    if (!image || typeof image.data !== 'string') {
+      console.error('[GEMINI-IMAGE] No image data in successful response:', data);
+      return NextResponse.json({ error: 'Gemini returned a response but no image data. Check the API key and image-model access.' }, { status: 502 });
     }
 
     return NextResponse.json({
-      imageBase64: imagePart.inlineData.data,
-      mimeType: imagePart.inlineData.mimeType || 'image/png',
-      prompt: enhancedPrompt
+      imageBase64: image.data,
+      mimeType: typeof image.mime_type === 'string' ? image.mime_type : typeof image.mimeType === 'string' ? image.mimeType : 'image/png',
+      prompt: enhancedPrompt,
+      model: 'gemini-nano-banana-2.1'
     });
   } catch (error) {
-    console.error('Image generation request failed:', error);
+    console.error('[GEMINI-IMAGE] Request failed:', error);
     return NextResponse.json(
-      { error: 'The image request could not be completed. Please try again.' },
-      { status: 500 }
+      { error: error instanceof Error && error.name === 'TimeoutError' ? 'Image generation timed out. Please try again.' : 'The image request could not be completed.' },
+      { status: 502 }
     );
   }
 }
