@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVideoJob } from '@/lib/freeVideo';
+import { getVideoJob } from '../freeVideo';
 
 export const runtime = 'nodejs';
 
