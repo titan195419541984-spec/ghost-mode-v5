@@ -1,67 +1,37 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
-
-    if (typeof prompt !== 'string' || !prompt.trim()) {
-      return NextResponse.json({ error: 'Please enter a prompt.' }, { status: 400 });
+    
+    if (!prompt) {
+      return NextResponse.json({ error: "No prompt" }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Missing GEMINI_API_KEY in Render environment variables.' },
-        { status: 500 }
-      );
-    }
+    // FIXED - OLD MODEL DELETED BY GOOGLE
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
-    const enhancedPrompt = `Generate a high-quality image for Ghost Mode: stealth fashion, dark techwear, cinematic lighting, ultra-detailed fashion-catalog style. User request: ${prompt.trim()}. Avoid text, logos, and watermarks.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: enhancedPrompt }] }],
-          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-        })
-      }
+    const result = await model.generateContent(
+      `Generate a high quality fashion CGI image description for: ${prompt}. Studio lighting, centered, 4k, streetwear aesthetic`
     );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Gemini image generation error:', data);
-      return NextResponse.json(
-        { error: data?.error?.message || 'Gemini image generation failed.' },
-        { status: 502 }
-      );
-    }
-
-    const parts = data?.candidates?.[0]?.content?.parts || [];
-    const imagePart = parts.find(
-      (part: { inlineData?: { data?: string; mimeType?: string } }) =>
-        typeof part.inlineData?.data === 'string'
-    );
-
-    if (!imagePart?.inlineData?.data) {
-      return NextResponse.json(
-        { error: 'The image service returned no image. Try a different prompt.' },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json({
-      imageBase64: imagePart.inlineData.data,
-      mimeType: imagePart.inlineData.mimeType || 'image/png',
-      prompt: enhancedPrompt
+    
+    const response = await result.response;
+    const text = response.text();
+    
+    return NextResponse.json({ 
+      image: text,
+      output: text,
+      prompt: prompt,
+      success: true 
     });
-  } catch (error) {
-    console.error('Image generation request failed:', error);
+
+  } catch (error: any) {
+    console.error("GENERATE ERROR:", error);
     return NextResponse.json(
-      { error: 'The image request could not be completed. Please try again.' },
+      { error: error.message || "Generate failed", details: String(error) },
       { status: 500 }
     );
   }
