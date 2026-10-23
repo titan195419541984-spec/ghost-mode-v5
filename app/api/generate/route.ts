@@ -19,10 +19,13 @@ export async function POST(req: NextRequest) {
     const enhancedPrompt = `Generate a high-quality fashion CGI image for Ghost Mode: stealth fashion, dark techwear, cinematic studio lighting, ultra-detailed fashion catalog style. User request: ${prompt.trim()}. Avoid text, logos, and watermarks.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${encodeURIComponent(apiKey)}`,
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: enhancedPrompt }] }],
           generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
@@ -41,12 +44,14 @@ export async function POST(req: NextRequest) {
     }
 
     const parts = data?.candidates?.[0]?.content?.parts || [];
-    const imagePart = parts.find(
+    const imageParts = parts.filter(
       (part: { inlineData?: { data?: string; mimeType?: string } }) =>
         typeof part.inlineData?.data === 'string'
     );
+    const imagePart = imageParts[imageParts.length - 1];
 
     if (!imagePart?.inlineData?.data) {
+      console.error('Gemini returned no image data:', data);
       return NextResponse.json(
         { error: 'The image service returned no image. Try a different prompt.' },
         { status: 502 }
