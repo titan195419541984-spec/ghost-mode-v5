@@ -1,57 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getVideoJob } from '@/lib/freeVideo';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env.PIXAZO_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { success: false, error: 'Pixazo is not configured. Add PIXAZO_API_KEY to the Render environment variables.' },
-      { status: 500 }
-    );
-  }
-
   const jobId = request.nextUrl.searchParams.get('job_id') || '';
-  if (!/^[A-Za-z0-9_-]{1,160}$/.test(jobId)) {
-    return NextResponse.json({ success: false, error: 'A valid job_id query parameter is required.' }, { status: 400 });
-  }
-
-  try {
-    const upstream = await fetch(`https://gateway.pixazo.ai/v2/requests/status/${encodeURIComponent(jobId)}`, {
-      headers: { 'Ocp-Apim-Subscription-Key': apiKey },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(15000)
-    });
-    const raw = await upstream.text();
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      data = { message: raw.slice(0, 1000) };
-    }
-
-    if (!upstream.ok) {
-      return NextResponse.json(
-        { success: false, error: 'Could not retrieve the Pixazo job status.', provider_status: upstream.status, details: data },
-        { status: upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502 }
-      );
-    }
-
-    const output = data.output && typeof data.output === 'object' ? data.output as Record<string, unknown> : {};
-    const mediaUrls = Array.isArray(output.media_url) ? output.media_url : [];
-    return NextResponse.json({
-      success: true,
-      status: data.status ?? 'QUEUED',
-      job_id: jobId,
-      assets: {
-        video_url: typeof mediaUrls[0] === 'string' ? mediaUrls[0] : undefined,
-        thumbnail_url: ''
-      },
-      error: typeof data.error === 'string' ? data.error : undefined,
-      provider: data
-    });
-  } catch (error) {
-    console.error('[PIXAZO-CGI] Status check failed:', error);
-    return NextResponse.json({ success: false, error: 'Could not check the video job status.' }, { status: 502 });
-  }
+  if (!/^[A-Za-z0-9_-]{1,160}$/.test(jobId)) return NextResponse.json({ success: false, error: 'A valid job_id query parameter is required.' }, { status: 400 });
+  const job = getVideoJob(jobId);
+  if (!job) return NextResponse.json({ success: false, error: 'This video job is no longer available in this server session. Please submit it again.' }, { status: 404 });
+  return NextResponse.json({ success: true, status: job.status, job_id: jobId, assets: { video_url: job.videoUrl, thumbnail_url: '' }, error: job.error, seed: job.seedUsed }, { headers: { 'Cache-Control': 'no-store' } });
 }
