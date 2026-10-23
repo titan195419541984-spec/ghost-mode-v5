@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 
+const styles: Record<string, string> = {
+  'Follow my prompt': 'Follow the user prompt faithfully. Do not impose a preset genre.',
+  'Photorealistic': 'Photorealistic image, believable materials and anatomy, natural camera optics, realistic lighting.',
+  '3D CGI': 'High-end 3D render, intentional material design, sophisticated lighting and physically based rendering.',
+  'Anime': 'Polished anime illustration, expressive shapes, deliberate linework and rich color design.',
+  'Dark / cinematic': 'Dark cinematic atmosphere, dramatic directional lighting, deep shadows and controlled highlights.',
+  'Fantasy': 'Imaginative fantasy concept art, evocative environment, intricate worldbuilding and atmospheric depth.',
+  'Sci-fi': 'Original science-fiction visual design, futuristic materials and environments, distinctive visual storytelling.',
+  'Horror': 'Atmospheric horror art, unsettling composition, dramatic shadows and eerie environmental details.',
+  'Product photo': 'Professional commercial product photography, clear subject separation, refined studio lighting and materials.',
+  'Fashion editorial': 'High-end fashion editorial photography, deliberate styling, confident composition and magazine-quality lighting.',
+  'Watercolor': 'Watercolor illustration, visible pigment texture, soft edges and expressive color blending.',
+  'Pixel art': 'Carefully composed pixel art, readable silhouettes, intentional pixel clusters and a cohesive limited palette.'
+};
+
 export async function POST(req: NextRequest) {
   try {
     let body: unknown;
@@ -11,9 +26,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Request body must be valid JSON.' }, { status: 400 });
     }
 
-    const prompt = body && typeof body === 'object' && !Array.isArray(body)
-      ? (body as Record<string, unknown>).prompt
-      : undefined;
+    const values = body && typeof body === 'object' && !Array.isArray(body)
+      ? body as Record<string, unknown>
+      : {};
+    const prompt = values.prompt;
+    const style = typeof values.style === 'string' && styles[values.style] ? values.style : 'Follow my prompt';
 
     if (typeof prompt !== 'string' || !prompt.trim()) {
       return NextResponse.json({ error: 'Please enter a prompt.' }, { status: 400 });
@@ -22,10 +39,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Prompt must be 4000 characters or fewer.' }, { status: 400 });
     }
 
-    const enhancedPrompt = `Generate a high-quality fashion CGI image for Ghost Mode: stealth fashion, dark techwear, cinematic studio lighting, ultra-detailed fashion catalog style. User request: ${prompt.trim()}. Avoid text, logos, and watermarks.`;
+    // Change the composition direction each time without changing the user's subject.
+    const variation = Math.random().toString(36).slice(2, 10);
+    const enhancedPrompt = [
+      prompt.trim(),
+      styles[style],
+      'Create a fresh, original interpretation. Make deliberate choices about composition, camera angle, framing, environment, color palette, lighting and visual details. Avoid generic stock-image layouts and avoid repeating a previous composition.',
+      'Do not add text, logos, or watermarks unless the user explicitly requests them.',
+      `Variation key: ${variation}.`
+    ].join('\n\n');
 
-    // Prefer Cloudflare Workers AI when configured. FLUX.1 Schnell has a documented
-    // daily free allocation on Cloudflare's Workers Free plan.
     const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
     const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
     if (cfAccountId && cfApiToken) {
@@ -60,7 +83,7 @@ export async function POST(req: NextRequest) {
           ? (errors[0] as Record<string, unknown>).message
           : undefined;
         return NextResponse.json(
-          { error: typeof firstError === 'string' ? firstError : 'Cloudflare image generation failed. Check the Cloudflare API token, account ID, and free daily allowance.', provider_status: upstream.status },
+          { error: typeof firstError === 'string' ? firstError : 'Cloudflare image generation failed. Check the API token, account ID, and daily allowance.', provider_status: upstream.status },
           { status: 502 }
         );
       }
@@ -73,11 +96,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Keep the existing Gemini path available until Cloudflare credentials are configured.
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({
-        error: 'Image generation is not configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in Render to use Cloudflare Workers AI free daily allowance.'
+        error: 'Image generation is not configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in Render, or configure GEMINI_API_KEY.'
       }, { status: 500 });
     }
 
@@ -109,7 +131,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // The Interactions API may expose image data through output_image or as an image block in output/steps.
     const candidates: unknown[] = [];
     const collect = (value: unknown, depth = 0): void => {
       if (depth > 8 || !value || typeof value !== 'object') return;
@@ -138,7 +159,7 @@ export async function POST(req: NextRequest) {
       model: 'gemini-nano-banana-2.1'
     });
   } catch (error) {
-    console.error('[GEMINI-IMAGE] Request failed:', error);
+    console.error('[IMAGE-GENERATION] Request failed:', error);
     return NextResponse.json(
       { error: error instanceof Error && error.name === 'TimeoutError' ? 'Image generation timed out. Please try again.' : 'The image request could not be completed.' },
       { status: 502 }
