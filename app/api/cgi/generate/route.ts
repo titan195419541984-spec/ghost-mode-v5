@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       status: data.status ?? (videoUrl ? 'completed' : 'processing'),
       job_id: jobId,
       estimated_time: data.estimated_time,
-      poll_url: jobId ? `/api/cgi/status/${encodeURIComponent(jobId)}` : undefined,
+      poll_url: jobId ? `/api/cgi/status?job_id=${encodeURIComponent(jobId)}` : undefined,
       assets: {
         video_url: videoUrl,
         thumbnail_url: typeof data.cover_url === 'string' ? data.cover_url : ''
