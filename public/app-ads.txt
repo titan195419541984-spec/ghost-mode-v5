@@ -1,4 +1,1 @@
-# Render - Ghost Mode - AppLovin app-ads.txt
-# Replace YOUR_SDK_KEY with the actual AppLovin SDK key from the publisher dashboard.
-applovin.com, YOUR_SDK_KEY, DIRECT, c2d0f7b83b4c1e4e
-google.com, pub-3940256099942544, DIRECT, f08c47fec0942544
+google.com, pub-9616956000265389, DIRECT, f08c47fec0942fa0
