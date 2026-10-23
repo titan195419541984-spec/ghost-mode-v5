@@ -16,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
         ></script>
         <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#C8FF00" />
       </head>
       <body>{children}</body>
     </html>
