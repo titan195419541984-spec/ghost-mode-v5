@@ -15,9 +15,7 @@ export default function GhostModeGenerator() {
   const [videoStatus, setVideoStatus] = useState('');
   const [duration, setDuration] = useState('5');
   const [aspectRatio, setAspectRatio] = useState('9:16');
-  const [resolution, setResolution] = useState('720p');
-  const [videoStyle, setVideoStyle] = useState('photorealistic');
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     document.querySelectorAll('.adsbygoogle').forEach(() => {
@@ -46,7 +44,7 @@ export default function GhostModeGenerator() {
     try {
       const res = await fetch('/api/cgi/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt.trim(), duration: Number(duration), aspect_ratio: aspectRatio, resolution, style: videoStyle })
+        body: JSON.stringify({ prompt: prompt.trim(), duration: Number(duration), aspect_ratio: aspectRatio })
       });
       const data = await res.json();
       if (!res.ok || !data.success) { setError(data.error || 'Video generation could not start.'); setVideoStatus(''); return; }
@@ -132,12 +130,11 @@ export default function GhostModeGenerator() {
           <section className="mt-5 p-4 sm:p-5 rounded-2xl border border-[#303030] bg-[#111111]">
             <div className="flex items-center justify-between gap-2 mb-4"><h3 className="font-black">VIDEO SETTINGS</h3><span className="text-[10px] text-[#D4FF32] border border-[#3D4A15] rounded-full px-2 py-1">AI GENERATED</span></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label htmlFor="duration" className="block text-xs text-[#A7A7A7] mb-2">Duration</label><select id="duration" value={duration} onChange={e => setDuration(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm">{[5, 6, 8, 10, 4, 3, 2].map(n => <option key={n} value={n}>{n} seconds</option>)}</select></div>
-              <div><label htmlFor="ratio" className="block text-xs text-[#A7A7A7] mb-2">Video format</label><select id="ratio" value={aspectRatio} onChange={e => setAspectRatio(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm"><option value="9:16">9:16 · Shorts / Reels</option><option value="16:9">16:9 · YouTube</option><option value="1:1">1:1 · Square</option></select></div>
-              <div><label htmlFor="resolution" className="block text-xs text-[#A7A7A7] mb-2">Resolution</label><select id="resolution" value={resolution} onChange={e => setResolution(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm"><option value="720p">720p HD</option><option value="1080p">1080p Full HD</option></select></div>
-              <div><label htmlFor="videoStyle" className="block text-xs text-[#A7A7A7] mb-2">Rendering style</label><select id="videoStyle" value={videoStyle} onChange={e => setVideoStyle(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm"><option value="photorealistic">Photorealistic</option><option value="animated">Animated</option><option value="artistic">Artistic</option></select></div>
+              <div><label htmlFor="duration" className="block text-xs text-[#A7A7A7] mb-2">Duration</label><select id="duration" value={duration} onChange={e => setDuration(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm">{[5, 6, 8, 10, 3, 4].filter(n => n >= 3).map(n => <option key={n} value={n}>{n} seconds</option>)}</select></div>
+              <div><label htmlFor="ratio" className="block text-xs text-[#A7A7A7] mb-2">Video format</label><select id="ratio" value={aspectRatio} onChange={e => setAspectRatio(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm"><option value="9:16">9:16 · Shorts / Reels</option><option value="16:9">16:9 · YouTube</option></select></div>
+              
             </div>
-            <p className="text-[11px] leading-5 text-[#777] mt-3">Vertical is ideal for Shorts, TikTok and Reels. Longer clips and higher resolutions may take longer or depend on your provider plan.</p>
+            <p className="text-[11px] leading-5 text-[#777] mt-3">Vertical is ideal for Shorts, TikTok and Reels. Video generation uses Pixazo Gemini Omni 1.1 Flash. Generation is billed per second of output; check your Pixazo balance and pricing before generating.</p>
           </section>
         ) : (
           <><label htmlFor="style" className="block text-sm font-bold mt-5 mb-2">Visual style</label><select id="style" value={style} onChange={e => setStyle(e.target.value)} className="w-full bg-[#141414] border border-[#303030] rounded-xl p-3 text-sm text-white focus:border-[#D4FF32] outline-none">{styleOptions.map(option => <option key={option} value={option}>{option}</option>)}</select><p className="text-xs text-[#929292] mt-2">“Follow my prompt” lets your idea lead instead of forcing every image into one look.</p></>
@@ -147,7 +144,7 @@ export default function GhostModeGenerator() {
         {loading && mode === 'video' && <div className="mt-3 p-3 rounded-xl bg-[#141414] border border-[#303030] text-sm text-[#D4FF32] animate-pulse">{videoStatus || 'Preparing your video…'}<div className="mt-2 h-1 rounded-full bg-[#292929] overflow-hidden"><div className="h-full w-1/2 bg-[#D4FF32] rounded-full" /></div></div>}
         {error && <div role="alert" className="mt-4 p-3 rounded-xl border border-red-900 bg-red-950/40 text-sm text-red-200"><p>{error}</p>{error.includes('PIXAZO_API_KEY') && <p className="mt-2 text-xs text-red-100">Render → ghost-mode-v5-1 → Environment → add PIXAZO_API_KEY, then redeploy. Use your own key from the provider; do not post it in chat.</p>}</div>}
 
-        {video?.video_url && <section className="mt-6 rounded-3xl overflow-hidden border border-[#333] bg-[#141414] p-3"><div className="flex justify-between items-center gap-2 mb-3"><div><p className="text-xs uppercase tracking-widest text-[#D4FF32] font-bold">Render complete</p><p className="text-sm font-bold mt-1">Your video is ready</p></div><span className="text-xs text-[#999]">{duration}s · {aspectRatio} · {resolution}</span></div><video controls playsInline poster={video.thumbnail_url || undefined} src={video.video_url} className="w-full rounded-2xl bg-black" /><a href={video.video_url} target="_blank" rel="noreferrer" download="ghost-mode-video.mp4" className="mt-3 block w-full text-center rounded-full bg-[#D4FF32] text-black font-black text-sm py-3">DOWNLOAD VIDEO ↗</a><p className="text-[11px] text-[#777] mt-2">Download opens the provider’s video file if direct downloading is supported by the browser.</p></section>}
+        {video?.video_url && <section className="mt-6 rounded-3xl overflow-hidden border border-[#333] bg-[#141414] p-3"><div className="flex justify-between items-center gap-2 mb-3"><div><p className="text-xs uppercase tracking-widest text-[#D4FF32] font-bold">Render complete</p><p className="text-sm font-bold mt-1">Your video is ready</p></div><span className="text-xs text-[#999]">{duration}s · {aspectRatio}</span></div><video controls playsInline poster={video.thumbnail_url || undefined} src={video.video_url} className="w-full rounded-2xl bg-black" /><a href={video.video_url} target="_blank" rel="noreferrer" download="ghost-mode-video.mp4" className="mt-3 block w-full text-center rounded-full bg-[#D4FF32] text-black font-black text-sm py-3">DOWNLOAD VIDEO ↗</a><p className="text-[11px] text-[#777] mt-2">Download opens the provider’s video file if direct downloading is supported by the browser.</p></section>}
         {image && <section className="mt-6 rounded-3xl overflow-hidden border border-[#292929] bg-[#141414] p-2"><img src={image} alt={prompt} className="w-full rounded-2xl" /><div className="p-3 flex items-center justify-between gap-3"><span className="text-xs text-[#A8A5A0]">{style} · Generated image</span><a href={image} download="ghost-mode-image.jpg" className="text-xs font-bold bg-[#D4FF32] text-black px-4 py-2 rounded-full">Download image</a></div><button onClick={generateImage} disabled={loading} className="w-full mt-1 mb-2 h-11 rounded-full border border-[#444] text-sm font-bold disabled:opacity-50">{loading ? 'GENERATING…' : 'TRY ANOTHER VERSION'}</button></section>}
 
         <p className="text-center text-xs text-[#626262] mt-7">Your prompt sets the direction. Choose the format, dial in the look, and generate something new.</p>
