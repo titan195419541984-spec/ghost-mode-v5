@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'gemini-nano-banana-2.1',
         input: enhancedPrompt,
-        response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: '1:1', image_size: '1K' }
+        response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '1:1', image_size: '1K' }
       }),
       signal: AbortSignal.timeout(90000),
       cache: 'no-store'
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       imageBase64: image.data,
-      mimeType: typeof image.mime_type === 'string' ? image.mime_type : typeof image.mimeType === 'string' ? image.mimeType : 'image/png',
+      mimeType: typeof image.mime_type === 'string' ? image.mime_type : typeof image.mimeType === 'string' ? image.mimeType : 'image/jpeg',
       prompt: enhancedPrompt,
       model: 'gemini-nano-banana-2.1'
     });
