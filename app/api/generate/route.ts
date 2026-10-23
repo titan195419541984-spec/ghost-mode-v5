@@ -22,12 +22,65 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Prompt must be 4000 characters or fewer.' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'Missing GEMINI_API_KEY in Render environment variables.' }, { status: 500 });
+    const enhancedPrompt = `Generate a high-quality fashion CGI image for Ghost Mode: stealth fashion, dark techwear, cinematic studio lighting, ultra-detailed fashion catalog style. User request: ${prompt.trim()}. Avoid text, logos, and watermarks.`;
+
+    // Prefer Cloudflare Workers AI when configured. FLUX.1 Schnell has a documented
+    // daily free allocation on Cloudflare's Workers Free plan.
+    const cfAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    const cfApiToken = process.env.CLOUDFLARE_API_TOKEN;
+    if (cfAccountId && cfApiToken) {
+      const upstream = await fetch(
+        `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${cfApiToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ prompt: enhancedPrompt, steps: 4 }),
+          signal: AbortSignal.timeout(90000),
+          cache: 'no-store'
+        }
+      );
+
+      const raw = await upstream.text();
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(raw) as Record<string, unknown>; }
+      catch { data = { message: raw.slice(0, 1000) }; }
+
+      const result = data.result && typeof data.result === 'object'
+        ? data.result as Record<string, unknown>
+        : undefined;
+      const imageBase64 = result && typeof result.image === 'string' ? result.image : undefined;
+
+      if (!upstream.ok || !imageBase64) {
+        console.error('[CLOUDFLARE-IMAGE] Upstream request failed:', upstream.status, data);
+        const errors = Array.isArray(data.errors) ? data.errors : [];
+        const firstError = errors[0] && typeof errors[0] === 'object'
+          ? (errors[0] as Record<string, unknown>).message
+          : undefined;
+        return NextResponse.json(
+          { error: typeof firstError === 'string' ? firstError : 'Cloudflare image generation failed. Check the Cloudflare API token, account ID, and free daily allowance.', provider_status: upstream.status },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json({
+        imageBase64,
+        mimeType: 'image/jpeg',
+        prompt: enhancedPrompt,
+        model: '@cf/black-forest-labs/flux-1-schnell'
+      });
     }
 
-    const enhancedPrompt = `Generate a high-quality fashion CGI image for Ghost Mode: stealth fashion, dark techwear, cinematic studio lighting, ultra-detailed fashion catalog style. User request: ${prompt.trim()}. Avoid text, logos, and watermarks.`;
+    // Keep the existing Gemini path available until Cloudflare credentials are configured.
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({
+        error: 'Image generation is not configured. Add CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in Render to use Cloudflare Workers AI free daily allowance.'
+      }, { status: 500 });
+    }
+
     const upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
