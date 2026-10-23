@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
-import { startVideoJob } from '@/lib/freeVideo';
+import { startVideoJob } from '../freeVideo';
 
 export const runtime = 'nodejs';
 
