@@ -43,10 +43,10 @@ export default function GhostModeGenerator() {
         body: JSON.stringify({ prompt: prompt.trim(), duration: Number(duration), aspect_ratio: aspectRatio })
       });
       const data = await res.json();
-      if (!res.ok || !data.success) { setError(data.error || 'Video generation could not start.'); setVideoStatus(''); return; }
+      if (!res.ok || !data.success) { setError(data.error || 'Video generation could not start.'); setVideoStatus(''); setLoading(false); return; }
       const immediateUrl = data.assets?.video_url;
-      if (immediateUrl) { setVideo({ video_url: immediateUrl, thumbnail_url: data.assets?.thumbnail_url }); setVideoStatus('Video ready'); return; }
-      if (!data.job_id) { setError('The video provider accepted the request but did not return a job ID.'); setVideoStatus(''); return; }
+      if (immediateUrl) { setVideo({ video_url: immediateUrl, thumbnail_url: data.assets?.thumbnail_url }); setVideoStatus('Video ready'); setLoading(false); return; }
+      if (!data.job_id) { setError('The video provider accepted the request but did not return a job ID.'); setVideoStatus(''); setLoading(false); return; }
 
       setVideoStatus('Rendering your video… this can take a few minutes.');
       let attempts = 0;
@@ -102,28 +102,28 @@ export default function GhostModeGenerator() {
   };
 
   return (
-    <main id="studio" className="min-h-screen bg-[#0A0A0A] text-[#F2F0E9] px-4 py-6 sm:p-6">
-      <div className="max-w-3xl mx-auto">
-        <header className="flex items-center gap-3 my-7">
+    <main id="studio" className="studio-main min-h-screen bg-[#0A0A0A] text-[#F2F0E9] px-4 py-6 sm:p-6">
+      <div className="studio-container max-w-3xl mx-auto">
+        <header className="studio-brand flex items-center gap-3 my-7">
           <div className="w-10 h-10 shrink-0 rounded-full bg-[#D4FF32] text-black flex items-center justify-center font-black text-lg">G</div>
           <div><h1 className="font-black tracking-tight text-xl">GHOST MODE</h1><p className="text-xs text-[#929292]">AI CREATIVE STUDIO · MAKE IT MOVE</p></div>
           <span className="ml-auto text-[10px] px-2 py-1 rounded-full bg-[#202020] text-[#D4FF32]">V5 STUDIO</span>
         </header>
 
         <nav className="studio-nav" aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="/guide">Prompt guide</a><a href="/privacy">Privacy</a></nav>
-        <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#141414] border border-[#303030] mb-6">
+        <div className="studio-mode-switch grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#141414] border border-[#303030] mb-6">
           <button type="button" onClick={() => selectMode('video')} className={`rounded-xl py-3 text-sm font-black tracking-wide ${mode === 'video' ? 'bg-[#D4FF32] text-black' : 'text-[#9A9A9A]'}`}>▶ VIDEO LAB</button>
           <button type="button" onClick={() => selectMode('image')} className={`rounded-xl py-3 text-sm font-black tracking-wide ${mode === 'image' ? 'bg-[#D4FF32] text-black' : 'text-[#9A9A9A]'}`}>✦ IMAGE LAB</button>
         </div>
 
-        <div className="mb-4"><div className="text-[11px] uppercase tracking-[.22em] text-[#D4FF32] font-bold">{mode === 'video' ? 'Text-to-video generator' : 'AI image generator'}</div><h2 className="text-2xl sm:text-3xl font-black mt-1">{mode === 'video' ? 'Make your idea move.' : 'Create a new visual.'}</h2><p className="text-sm text-[#929292] mt-2">{mode === 'video' ? 'Describe the scene, the movement, the camera, and the mood. Ghost Mode turns your prompt into a video clip.' : 'Build an original image from a prompt and choose a visual style.'}</p></div>
+        <div className="studio-intro mb-4"><div className="text-[11px] uppercase tracking-[.22em] text-[#D4FF32] font-bold">{mode === 'video' ? 'Text-to-video generator' : 'AI image generator'}</div><h2 className="text-2xl sm:text-3xl font-black mt-1">{mode === 'video' ? 'Make your idea move.' : 'Create a new visual.'}</h2><p className="text-sm text-[#929292] mt-2">{mode === 'video' ? 'Describe the scene, the movement, the camera, and the mood. Ghost Mode turns your prompt into a video clip.' : 'Build an original image from a prompt and choose a visual style.'}</p></div>
 
         <label htmlFor="prompt" className="block text-sm font-bold mb-2">Describe your {mode === 'video' ? 'video scene and motion' : 'image'}</label>
-        <textarea id="prompt" value={prompt} onChange={e => setPrompt(e.target.value)} className="w-full min-h-36 bg-[#141414] border border-[#303030] rounded-2xl p-4 text-sm leading-6 focus:border-[#D4FF32] outline-none" placeholder={mode === 'video' ? 'A cinematic chase through a neon city, rain spraying from the tires, low tracking camera…' : 'A robot chef cooking ramen in a rainy Tokyo alley…'} maxLength={4000} />
+        <textarea id="prompt" value={prompt} onChange={e => setPrompt(e.target.value)} className="studio-prompt w-full min-h-36 bg-[#141414] border border-[#303030] rounded-2xl p-4 text-sm leading-6 focus:border-[#D4FF32] outline-none" placeholder={mode === 'video' ? 'A cinematic chase through a neon city, rain spraying from the tires, low tracking camera…' : 'A robot chef cooking ramen in a rainy Tokyo alley…'} maxLength={4000} />
         <button type="button" onClick={surpriseMe} className="mt-2 text-xs text-[#D4FF32] underline underline-offset-4">⚡ Surprise me with a cinematic idea</button>
 
         {mode === 'video' ? (
-          <section className="mt-5 p-4 sm:p-5 rounded-2xl border border-[#303030] bg-[#111111]">
+          <section className="studio-settings mt-5 p-4 sm:p-5 rounded-2xl border border-[#303030] bg-[#111111]">
             <div className="flex items-center justify-between gap-2 mb-4"><h3 className="font-black">VIDEO SETTINGS</h3><span className="text-[10px] text-[#D4FF32] border border-[#3D4A15] rounded-full px-2 py-1">AI GENERATED</span></div>
             <div className="grid grid-cols-2 gap-3">
               <div><label htmlFor="duration" className="block text-xs text-[#A7A7A7] mb-2">Duration</label><select id="duration" value={duration} onChange={e => setDuration(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm">{[5, 6, 8, 10, 3, 4].filter(n => n >= 3).map(n => <option key={n} value={n}>{n} seconds</option>)}</select></div>
