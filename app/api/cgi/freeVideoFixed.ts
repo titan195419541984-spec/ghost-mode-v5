@@ -51,8 +51,9 @@ function enhanceVideoPrompt(prompt: string) {
 }
 
 async function generateOnFreeSpaceOnce(prompt: string, durationSeconds: number, aspectRatio: string, enhancePrompt: boolean) {
-  const width = aspectRatio === '16:9' ? 1024 : 576;
-  const height = aspectRatio === '16:9' ? 576 : 1024;
+  // Keep requests within shared ZeroGPU memory limits instead of sending 1024px frames.
+  const width = aspectRatio === '16:9' ? 640 : aspectRatio === '9:16' ? 352 : 512;
+  const height = aspectRatio === '16:9' ? 352 : aspectRatio === '9:16' ? 640 : 512;
   const data = [
     enhancePrompt ? enhanceVideoPrompt(prompt) : prompt.trim(),
     'low quality, blurry, flicker, jitter, warped geometry, distorted anatomy, duplicated subjects, morphing, inconsistent identity, sudden scene cuts, text, captions, logo, watermark',
@@ -65,8 +66,8 @@ async function generateOnFreeSpaceOnce(prompt: string, durationSeconds: number, 
     9,
     Math.floor(Math.random() * 4294967295),
     true,
-    1,
-    true
+    3,
+    false
   ];
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (process.env.HF_TOKEN) headers.Authorization = 'Bearer ' + process.env.HF_TOKEN;
