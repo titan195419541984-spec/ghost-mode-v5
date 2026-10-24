@@ -37,12 +37,21 @@ function parseSseResult(raw: string): { videoUrl: string; seedUsed?: number } {
   throw new Error('The free video model timed out or closed the connection before returning a video.');
 }
 
+function enhanceVideoPrompt(prompt: string) {
+  return [
+    prompt.trim(),
+    'Visual direction: make the described subject and action the unmistakable focus. Use a clear, deliberate composition, readable subject silhouette, coherent environment, cinematic lighting, natural color and convincing physical motion.',
+    'Motion direction: show one continuous, clearly readable action from beginning to end. Keep the main subject visually consistent across frames; maintain stable shape, identity, proportions, clothing and environment. Use smooth, motivated camera movement and realistic momentum. Keep motion purposeful rather than random.',
+    'Quality direction: polished cinematic footage, sharp subject detail, natural motion blur, believable depth and perspective, temporal consistency, stable geometry, no flicker, no morphing, no sudden scene changes. Avoid unnecessary objects or visual clutter. Do not add titles, captions, logos or watermarks.'
+  ].join('\n\n');
+}
+
 async function generateOnFreeSpace(prompt: string, durationSeconds: number, aspectRatio: string) {
   const width = aspectRatio === '16:9' ? 1024 : 576;
   const height = aspectRatio === '16:9' ? 576 : 1024;
   const data = [
-    prompt,
-    'worst quality, blurry, distorted, watermark',
+    enhanceVideoPrompt(prompt),
+    'low quality, blurry, flicker, jitter, warped geometry, distorted anatomy, duplicated subjects, morphing, inconsistent identity, sudden scene cuts, text, captions, logo, watermark',
     '',
     '',
     height,
