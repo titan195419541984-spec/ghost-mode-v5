@@ -50,10 +50,21 @@ function enhanceVideoPrompt(prompt: string) {
   ].join('\n\n');
 }
 
-async function generateOnFreeSpaceOnce(prompt: string, durationSeconds: number, aspectRatio: string, enhancePrompt: boolean) {
-  // Keep requests within shared ZeroGPU memory limits instead of sending 1024px frames.
-  const width = aspectRatio === '16:9' ? 640 : aspectRatio === '9:16' ? 352 : 512;
-  const height = aspectRatio === '16:9' ? 352 : aspectRatio === '9:16' ? 640 : 512;
+async function generateOnFreeSpaceOnce(
+  prompt: string,
+  durationSeconds: number,
+  aspectRatio: string,
+  enhancePrompt: boolean,
+  lowMemoryFallback = false
+) {
+  // Start below the Space's maximum resolution; use a second lower-memory tier if inference still fails.
+  const width = lowMemoryFallback
+    ? (aspectRatio === '16:9' ? 512 : aspectRatio === '9:16' ? 288 : 384)
+    : (aspectRatio === '16:9' ? 640 : aspectRatio === '9:16' ? 352 : 512);
+  const height = lowMemoryFallback
+    ? (aspectRatio === '16:9' ? 288 : aspectRatio === '9:16' ? 512 : 384)
+    : (aspectRatio === '16:9' ? 352 : aspectRatio === '9:16' ? 640 : 512);
+  const requestedDuration = lowMemoryFallback ? Math.min(durationSeconds, 2) : durationSeconds;
   const data = [
     enhancePrompt ? enhanceVideoPrompt(prompt) : prompt.trim(),
     'low quality, blurry, flicker, jitter, warped geometry, distorted anatomy, duplicated subjects, morphing, inconsistent identity, sudden scene cuts, text, captions, logo, watermark',
@@ -62,7 +73,7 @@ async function generateOnFreeSpaceOnce(prompt: string, durationSeconds: number, 
     height,
     width,
     'text-to-video',
-    clamp(durationSeconds, 0.3, 8.5),
+    clamp(requestedDuration, 0.3, 8.5),
     9,
     Math.floor(Math.random() * 4294967295),
     true,
@@ -107,7 +118,16 @@ async function generateOnFreeSpace(prompt: string, durationSeconds: number, aspe
       return await generateOnFreeSpaceOnce(prompt, durationSeconds, aspectRatio, false);
     } catch (retryError) {
       const retryMessage = retryError instanceof Error ? retryError.message : 'Unknown model error.';
-      throw new Error('The free video model failed twice. ' + retryMessage + ' Please retry in a minute; the shared model may be temporarily unavailable.');
+      if (retryMessage.includes('empty error response')) {
+        console.warn('[FREE-VIDEO] Empty error persisted; retrying at lower resolution for up to 2 seconds.');
+        try {
+          return await generateOnFreeSpaceOnce(prompt, Math.min(durationSeconds, 2), aspectRatio, false, true);
+        } catch (lowMemoryError) {
+          const finalMessage = lowMemoryError instanceof Error ? lowMemoryError.message : 'Unknown model error.';
+          throw new Error('The free video model failed after three attempts. ' + finalMessage + ' The shared model may be unavailable or out of GPU memory. Configure HF_TOKEN in Render for your own Hugging Face quota, or try again later.');
+        }
+      }
+      throw new Error('The free video model failed twice. ' + retryMessage + ' The shared model may be unavailable. Configure HF_TOKEN in Render for your own Hugging Face quota, or try again later.');
     }
   }
 }
