@@ -21,7 +21,11 @@ function parseSseResult(raw: string): { videoUrl: string; seedUsed?: number } {
     const dataMatch = block.match(/^data:\s*(.+)$/m);
     if (!eventMatch || !dataMatch) continue;
     if (eventMatch[1] === 'error') {
-      throw new Error('The free video model failed: ' + dataMatch[1]);
+      const detail = dataMatch[1].trim();
+      if (!detail || detail === 'null' || detail === 'undefined') {
+        throw new Error('The free video model returned an empty error response; its shared GPU may be temporarily unavailable.');
+      }
+      throw new Error('The free video model failed: ' + detail);
     }
     if (eventMatch[1] === 'complete') {
       const payload = JSON.parse(dataMatch[1]);
@@ -40,17 +44,17 @@ function parseSseResult(raw: string): { videoUrl: string; seedUsed?: number } {
 function enhanceVideoPrompt(prompt: string) {
   return [
     prompt.trim(),
-    'Visual direction: make the described subject and action the unmistakable focus. Use a clear, deliberate composition, readable subject silhouette, coherent environment, cinematic lighting, natural color and convincing physical motion.',
-    'Motion direction: show one continuous, clearly readable action from beginning to end. Keep the main subject visually consistent across frames; maintain stable shape, identity, proportions, clothing and environment. Use smooth, motivated camera movement and realistic momentum. Keep motion purposeful rather than random.',
-    'Quality direction: polished cinematic footage, sharp subject detail, natural motion blur, believable depth and perspective, temporal consistency, stable geometry, no flicker, no morphing, no sudden scene changes. Avoid unnecessary objects or visual clutter. Do not add titles, captions, logos or watermarks.'
+    'Visual direction: clear composition, coherent environment, cinematic lighting, natural color and convincing physical motion.',
+    'Motion direction: one continuous readable action; keep the subject, proportions and environment consistent; use smooth camera movement and realistic momentum.',
+    'Quality direction: sharp subject detail, believable depth, stable geometry, natural motion blur; avoid flicker, morphing, sudden scene changes, clutter, text and watermarks.'
   ].join('\n\n');
 }
 
-async function generateOnFreeSpace(prompt: string, durationSeconds: number, aspectRatio: string) {
+async function generateOnFreeSpaceOnce(prompt: string, durationSeconds: number, aspectRatio: string, enhancePrompt: boolean) {
   const width = aspectRatio === '16:9' ? 1024 : 576;
   const height = aspectRatio === '16:9' ? 576 : 1024;
   const data = [
-    enhanceVideoPrompt(prompt),
+    enhancePrompt ? enhanceVideoPrompt(prompt) : prompt.trim(),
     'low quality, blurry, flicker, jitter, warped geometry, distorted anatomy, duplicated subjects, morphing, inconsistent identity, sudden scene cuts, text, captions, logo, watermark',
     '',
     '',
@@ -89,6 +93,22 @@ async function generateOnFreeSpace(prompt: string, durationSeconds: number, aspe
     throw new Error('Lost connection to the free video service (HTTP ' + resultRes.status + ').');
   }
   return parseSseResult(await resultRes.text());
+}
+
+async function generateOnFreeSpace(prompt: string, durationSeconds: number, aspectRatio: string) {
+  try {
+    return await generateOnFreeSpaceOnce(prompt, durationSeconds, aspectRatio, true);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (!message.includes('empty error response')) throw error;
+    console.warn('[FREE-VIDEO] Model returned an empty error; retrying once with the original prompt.');
+    try {
+      return await generateOnFreeSpaceOnce(prompt, durationSeconds, aspectRatio, false);
+    } catch (retryError) {
+      const retryMessage = retryError instanceof Error ? retryError.message : 'Unknown model error.';
+      throw new Error('The free video model failed twice. ' + retryMessage + ' Please retry in a minute; the shared model may be temporarily unavailable.');
+    }
+  }
 }
 
 export function getVideoJob(jobId: string) {
