@@ -58,10 +58,20 @@ export default function GhostModeGenerator() {
           if (!statusRes.ok || !statusData.success) throw new Error(statusData.error || 'Status check failed.');
           const state = String(statusData.status || 'processing').toLowerCase();
           const url = statusData.assets?.video_url;
-          if (url || ['completed', 'complete', 'succeeded', 'success', 'finished', 'done'].includes(state)) {
-            if (url) { setVideo({ video_url: url, thumbnail_url: statusData.assets?.thumbnail_url }); setVideoStatus('Video ready'); setLoading(false); return; }
+          if (url) {
+            setVideo({ video_url: url, thumbnail_url: statusData.assets?.thumbnail_url });
+            setVideoStatus('Video ready');
+            setLoading(false);
+            return;
           }
-          if (['failed', 'error', 'cancelled', 'canceled'].includes(state)) throw new Error('The video provider reported that generation failed. Try a shorter or simpler prompt.');
+          if (['failed', 'error', 'cancelled', 'canceled'].includes(state)) {
+            throw new Error(typeof statusData.error === 'string' && statusData.error
+              ? statusData.error
+              : 'The video provider reported that generation failed. Try a shorter or simpler prompt.');
+          }
+          if (['completed', 'complete', 'succeeded', 'success', 'finished', 'done'].includes(state)) {
+            throw new Error('The provider marked this job complete but returned no playable video URL. Please try again.');
+          }
           if (attempts >= 48) throw new Error('This video is taking longer than expected. Try again later; the provider job may still be processing.');
           setVideoStatus(`Rendering your video… check ${attempts} of 48`);
           pollTimer.current = setTimeout(poll, 5000);
