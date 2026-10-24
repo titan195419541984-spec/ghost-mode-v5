@@ -89,9 +89,9 @@ export function getVideoJob(jobId: string) {
 export function startVideoJob(jobId: string, prompt: string, durationSeconds: number, aspectRatio: string) {
   // Keep the in-memory queue bounded and discard old results.
   const now = Date.now();
-  for (const [id, job] of jobs) {
+  jobs.forEach((job, id) => {
     if (now - job.createdAt > 2 * 60 * 60 * 1000) jobs.delete(id);
-  }
+  });
   if (jobs.size > 100) {
     const oldest = jobs.keys().next().value;
     if (oldest) jobs.delete(oldest);
