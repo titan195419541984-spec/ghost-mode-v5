@@ -18,10 +18,6 @@ export default function GhostModeGenerator() {
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    document.querySelectorAll('.adsbygoogle').forEach(() => {
-      try { ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({}); }
-      catch (error) { console.error('AdSense initialization failed:', error); }
-    });
     return () => { if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, []);
 
@@ -106,15 +102,15 @@ export default function GhostModeGenerator() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] text-[#F2F0E9] px-4 py-6 sm:p-6">
-      <div className="max-w-2xl mx-auto">
-        <ins className="adsbygoogle block w-full" style={{ display: 'block' }} data-ad-client="ca-pub-9616956000265389" data-ad-slot="YOUR_SLOT_ID" data-ad-format="auto" data-full-width-responsive="true" />
+    <main id="studio" className="min-h-screen bg-[#0A0A0A] text-[#F2F0E9] px-4 py-6 sm:p-6">
+      <div className="max-w-3xl mx-auto">
         <header className="flex items-center gap-3 my-7">
           <div className="w-10 h-10 shrink-0 rounded-full bg-[#D4FF32] text-black flex items-center justify-center font-black text-lg">G</div>
           <div><h1 className="font-black tracking-tight text-xl">GHOST MODE</h1><p className="text-xs text-[#929292]">AI CREATIVE STUDIO · MAKE IT MOVE</p></div>
           <span className="ml-auto text-[10px] px-2 py-1 rounded-full bg-[#202020] text-[#D4FF32]">V5 STUDIO</span>
         </header>
 
+        <nav className="studio-nav" aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="/guide">Prompt guide</a><a href="/privacy">Privacy</a></nav>
         <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-[#141414] border border-[#303030] mb-6">
           <button type="button" onClick={() => selectMode('video')} className={`rounded-xl py-3 text-sm font-black tracking-wide ${mode === 'video' ? 'bg-[#D4FF32] text-black' : 'text-[#9A9A9A]'}`}>▶ VIDEO LAB</button>
           <button type="button" onClick={() => selectMode('image')} className={`rounded-xl py-3 text-sm font-black tracking-wide ${mode === 'image' ? 'bg-[#D4FF32] text-black' : 'text-[#9A9A9A]'}`}>✦ IMAGE LAB</button>
@@ -134,7 +130,7 @@ export default function GhostModeGenerator() {
               <div><label htmlFor="ratio" className="block text-xs text-[#A7A7A7] mb-2">Video format</label><select id="ratio" value={aspectRatio} onChange={e => setAspectRatio(e.target.value)} className="w-full bg-[#1B1B1B] border border-[#333] rounded-xl p-3 text-sm"><option value="9:16">9:16 · Shorts / Reels</option><option value="16:9">16:9 · YouTube</option></select></div>
               
             </div>
-            <p className="text-[11px] leading-5 text-[#777] mt-3">Vertical is ideal for Shorts, TikTok and Reels. Video generation uses Pixazo Gemini Omni 1.1 Flash. Generation is billed per second of output; check your Pixazo balance and pricing before generating.</p>
+            <p className="text-[11px] leading-5 text-[#777] mt-3">Vertical is ideal for Shorts, TikTok and Reels. Video generation uses a shared public model. Availability and wait times depend on the provider, and requests may be rate-limited.</p>
           </section>
         ) : (
           <><label htmlFor="style" className="block text-sm font-bold mt-5 mb-2">Visual style</label><select id="style" value={style} onChange={e => setStyle(e.target.value)} className="w-full bg-[#141414] border border-[#303030] rounded-xl p-3 text-sm text-white focus:border-[#D4FF32] outline-none">{styleOptions.map(option => <option key={option} value={option}>{option}</option>)}</select><p className="text-xs text-[#929292] mt-2">“Follow my prompt” lets your idea lead instead of forcing every image into one look.</p></>
@@ -142,13 +138,12 @@ export default function GhostModeGenerator() {
 
         <button onClick={mode === 'video' ? generateVideo : generateImage} disabled={loading || !prompt.trim()} className="w-full mt-5 h-14 rounded-full bg-[#D4FF32] text-black font-black tracking-widest disabled:opacity-50">{loading ? (mode === 'video' ? 'RENDERING YOUR VIDEO…' : 'CREATING YOUR IMAGE…') : (mode === 'video' ? '▶ GENERATE VIDEO' : '✦ GENERATE IMAGE')}</button>
         {loading && mode === 'video' && <div className="mt-3 p-3 rounded-xl bg-[#141414] border border-[#303030] text-sm text-[#D4FF32] animate-pulse">{videoStatus || 'Preparing your video…'}<div className="mt-2 h-1 rounded-full bg-[#292929] overflow-hidden"><div className="h-full w-1/2 bg-[#D4FF32] rounded-full" /></div></div>}
-        {error && <div role="alert" className="mt-4 p-3 rounded-xl border border-red-900 bg-red-950/40 text-sm text-red-200"><p>{error}</p>{error.includes('PIXAZO_API_KEY') && <p className="mt-2 text-xs text-red-100">Render → ghost-mode-v5-1 → Environment → add PIXAZO_API_KEY, then redeploy. Use your own key from the provider; do not post it in chat.</p>}</div>}
+        {error && <div role="alert" className="mt-4 p-3 rounded-xl border border-red-900 bg-red-950/40 text-sm text-red-200"><p>{error}</p></div>}
 
         {video?.video_url && <section className="mt-6 rounded-3xl overflow-hidden border border-[#333] bg-[#141414] p-3"><div className="flex justify-between items-center gap-2 mb-3"><div><p className="text-xs uppercase tracking-widest text-[#D4FF32] font-bold">Render complete</p><p className="text-sm font-bold mt-1">Your video is ready</p></div><span className="text-xs text-[#999]">{duration}s · {aspectRatio}</span></div><video controls playsInline poster={video.thumbnail_url || undefined} src={video.video_url} className="w-full rounded-2xl bg-black" /><a href={video.video_url} target="_blank" rel="noreferrer" download="ghost-mode-video.mp4" className="mt-3 block w-full text-center rounded-full bg-[#D4FF32] text-black font-black text-sm py-3">DOWNLOAD VIDEO ↗</a><p className="text-[11px] text-[#777] mt-2">Download opens the provider’s video file if direct downloading is supported by the browser.</p></section>}
         {image && <section className="mt-6 rounded-3xl overflow-hidden border border-[#292929] bg-[#141414] p-2"><img src={image} alt={prompt} className="w-full rounded-2xl" /><div className="p-3 flex items-center justify-between gap-3"><span className="text-xs text-[#A8A5A0]">{style} · Generated image</span><a href={image} download="ghost-mode-image.jpg" className="text-xs font-bold bg-[#D4FF32] text-black px-4 py-2 rounded-full">Download image</a></div><button onClick={generateImage} disabled={loading} className="w-full mt-1 mb-2 h-11 rounded-full border border-[#444] text-sm font-bold disabled:opacity-50">{loading ? 'GENERATING…' : 'TRY ANOTHER VERSION'}</button></section>}
 
         <p className="text-center text-xs text-[#626262] mt-7">Your prompt sets the direction. Choose the format, dial in the look, and generate something new.</p>
-        <ins className="adsbygoogle block w-full mt-6" style={{ display: 'block' }} data-ad-client="ca-pub-9616956000265389" data-ad-slot="YOUR_SLOT_ID" data-ad-format="auto" data-full-width-responsive="true" />
       </div>
     </main>
   );
